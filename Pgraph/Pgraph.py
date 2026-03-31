@@ -958,7 +958,7 @@ class Pgraph():
             print("Generated P-graph Studio File at ", path)
         return header+xml    
         
-    def run(self, system=None, skip_wine=False, solver_name='pgraph_solver.exe',path=None, input_file: str | None = None, output_file: str | None = None):
+    def run(self, system=None, skip_wine=False, solver_name='pgraph_solver.exe', input_file: str | None = None, output_file: str | None = None):
         '''
         run(system=None,skip_wine=False)
         
