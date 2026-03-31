@@ -11,9 +11,9 @@ import tempfile
 
 
 class Pgraph():
-    def __init__(self, problem_network, mutual_exclusion=[[]], solver="INSIDEOUT",max_sol=100, input_file=None):
+    def __init__(self, problem_network, mutual_exclusion=[], solver="INSIDEOUT",max_sol=100, input_file=None, additional_data=None):
         ''' 
-        Pgraph(problem_network, mutual_exclusion=[[]], solver="INSIDEOUT",max_sol=100)
+        Pgraph(problem_network, mutual_exclusion=[], solver="INSIDEOUT",max_sol=100)
                 
         Description
         This function initializes the Pgraph object and prepares the solver.
@@ -21,8 +21,9 @@ class Pgraph():
         Arguments
         problem_network: (DiGraph() object) Directed graph object specified using networkx
         mutual_exclusion: (list of list) List of lists containing mutually excluded elements. Symbols of nodes should be used. e.g. "M1"
-        solver: (str) solver type that is used. Possibilities include "MSE", "SSG", "SSGLP" (for SSG+LP), "INSIDEOUT" (for ABB)
-        max_sol: (int) Maximum number of solutions required for the solver.       
+        solver: (str) Solver type that is used. Possibilities include "MSG", "SSG", "SSGLP" (for SSG+LP), "INSIDEOUT" (for ABB)
+        max_sol: (int) Maximum number of solutions required for the solver.
+        additional_data: (object or list of objects) Used to define additional data that needs to be put at the end of the P-graph solver input file. Necessary for specific algorithms, ignored otherwise.
         
         '''
     
@@ -119,11 +120,15 @@ class Pgraph():
         
         Description
         This function creates the solver input from the networkx DiGraph() object specified.
+        
+        Arguments
+        path: (string) Path of folder to generate the input file in (does not fontain file name, only folder location). If None, then the default library installation path will be used.
 
         '''
 
         G=self.G
         ME=self.ME
+        path=self.path
         ### MAKE INPUT FILE #############
         prelines=[
         'file_type=PNS_problem_v1','\n',
@@ -213,7 +218,7 @@ class Pgraph():
                 
         prelines.append("\n")        
                 
-        with open(input_file, 'w') as f:
+        with open(path+'input.in', 'w') as f:
             for line in prelines:
                 f.write(line)
 
@@ -227,22 +232,31 @@ class Pgraph():
         Arguments:
         system: (string) (optional) Operating system. Options of "Windows", "Linux". MacOS is not supported yet. Specifying this makes function slightly faster.
         skip_wine: (boolean) Only relevent for Linux. Skip the dependency "wine" if it is already installed. 
-        solver_name= (string) For advanced users only. Choose your customized solver. 'pgraph_solver.exe' or 'pgraph_solver_new.exe'
-        path = (string) path to the custom solver. If None, then the default library installation path will be used.
+        solver_name: (string) For advanced users only. Choose your customized solver. 'pgraph_solver.exe' or 'pgraph_solver_new.exe'
+        path: (string) path to the custom solver. If None, then the default library installation path will be used.
         '''
         path=self.path
         max_sol=self.max_sol
         solver=self.solver
-        solver_dict={0:"MSG",1:"SSG",2:"SSGLP",3:"INSIDEOUT"}
-     
+        # solver_dict={0:"MSG",1:"SSG",2:"SSGLP",3:"INSIDEOUT"}
+        
+        additional_argument_list = []
+        for arg,value in additional_arguments.items():
+            additional_argument_list.append("--"+arg)
+            if value is not None and value != "":
+                if isinstance(value, list):
+                    additional_argument_list.extend([str(v) for v in value])
+                else:
+                    additional_argument_list.append(str(value))
+        
         if system==None:
             system=platform.system()
             
         if system=="Windows": #support for windows
             if type(self.input_file)==str:
-                rc=subprocess.run([path+solver_name,solver, input_file, path+"test_out.out", str(max_sol)])
+                rc=subprocess.run([path+solver_name,solver, self.input_file, path+"test_out.out", str(max_sol)]+additional_argument_list)
             else:
-                rc=subprocess.run([path+solver_name,solver, path+"input.in", path+"test_out.out", str(max_sol)])                
+                rc=subprocess.run([path+solver_name,solver, path+"input.in", path+"test_out.out", str(max_sol)]+additional_argument_list)                
         elif system=="Linux":
             # detect architecture, ARM or x86
             if platform.machine() in ["arm64", "aarch64"]:
@@ -270,10 +284,14 @@ class Pgraph():
         read_solutions()
         
         Description
-        Reads the solution from the solver.            
+        Reads the solution from the solver.     
+        
+        Arguments
+        path: (string) Path of folder to generate the input file in (does not fontain file name, only folder location). If None, then the default library installation path will be used.       
         '''
     
-        path=self.path
+        if path==None:
+            path=self.path
         gmatlist=[]
         goplist=[]
         goolist=[]
@@ -383,7 +401,8 @@ class Pgraph():
             self.goplist=goplist
             self.gmatlist=gmatlist
             self.goolist=goolist
-    def get_solution_as_network(self, sol_num=0):
+    
+    def get_solution_as_network(self, sol_num=0, return_excluded_nodes=False):
         '''
         get_solution_as_network(sol_num=0)
                 
@@ -392,6 +411,7 @@ class Pgraph():
         
         Arguments
         sol_num: (int) Index of the solution to be returned
+        return_excluded_nodes: (boolean) If True, the returnedd network will also contain the excluded nodes (ignored by algorithms only generating structures, e.g., SSG)
         
         Return:
         H: (networkx DiGraph() object) Directed Graph object of the solution.
@@ -402,6 +422,12 @@ class Pgraph():
         goplist=self.goplist
         goolist=self.goolist
         if self.solver in ["SSGLP","INSIDEOUT",2,3] :
+            if not return_excluded_nodes:
+                total_node=[node[0] for node in gmatlist[sol_num]]+[node[1] for node in goplist[sol_num]]
+                node_list=list(H.nodes()).copy()
+                for n in node_list:
+                    if n not in total_node:
+                        H.remove_node(n)
             for n in H.nodes():
                 if n[0]=="O":
                     H.nodes[n]['s']=mpl.markers.MarkerStyle(marker='s', fillstyle='top')
@@ -419,7 +445,7 @@ class Pgraph():
                     H.remove_node(n)
        
         return H
-        
+    
     def plot_solution(self,sol_num=0,figsize=(5,10),padding=0.25,titlepos=0.95,rescale=2,box=True,node_size=3000):
         '''
         plot_solution(sol_num=0,figsize=(5,10),padding=0,titlepos=0.95,rescale=2,box=True)
@@ -932,7 +958,7 @@ class Pgraph():
             print("Generated P-graph Studio File at ", path)
         return header+xml    
         
-    def run(self, system=None, skip_wine=False, solver_name='pgraph_solver.exe',path=None, input_file: str | None = None, output_file: str | None = None):
+    def run(self, system=None, skip_wine=False, solver_name='pgraph_solver.exe', input_file: str | None = None, output_file: str | None = None):
         '''
         run(system=None,skip_wine=False)
         
@@ -957,42 +983,10 @@ class Pgraph():
             skip_wine=skip_wine,
             solver_name=solver_name,
             input_file=input_file,
-            output_file=output_file,
+            output_file=output_file
         )
         self.read_solutions(output_file=output_file)
-
-        # 
         
-    def get_info(self):
-        '''
-        get_info()
-        
-        Description
-        Gets the material, operating unit and total costs information as a 3-element tuple. 
-        Different information is returned for (1) solvers with solutions (SSGLP, INSIDEOUT) and (2) solvers without solutions (SSG , MSG).
-        
-        Return
-        Material: 
-        (1) (DataFrame in list) This returns the materials name, flow and costs information in a DataFrame by solution number in list.
-        (2) (list in list) This returns all the materials names in list of a list arranged by solution number
-        OperatingUnit:
-        (1) (DataFrame in list) This returns the operating unit name, ratio and costs information in a DataFrame by solution number in list.
-        (2) (list in list) This returns all the operating unit names in list of a list arranged by solution number
-        TotalCosts:
-        (1) (DataFrame) This returns the total costs information in a DataFrame by solution number in list.
-        (2) (list) This returns total costs in a list arranged by solution number 
-        '''
-    
-        if self.solver in ["SSGLP","INSIDEOUT",2,3]:
-            OperatingUnit=[pd.DataFrame(x,columns=['Ratio','Names','Costs','Unit']).iloc[:,[1,0,2]] for x in self.goplist]
-            Materials=[pd.DataFrame(x,columns=['Names','Costs','MoneyUnit','Flow','FlowUnit']).iloc[:,[0,3,1]] for x in self.gmatlist]
-            TotalCosts=pd.DataFrame(self.goolist,columns=["Total Costs"])
-            TotalCosts.index.name='Solution Number'
-        else:
-            Materials=self.gmatlist
-            OperatingUnit=self.goplist
-            TotalCosts=self.goolist
-        return Materials,OperatingUnit,TotalCosts
     def get_sol_num(self):
         '''
         get_sol_num()
@@ -1011,8 +1005,8 @@ if __name__=="__main__":
     ### Prepare Network Structure #############
     G = nx.DiGraph()
     G.add_node("M1",names="Product A",type='product',flow_rate_lower_bound=100)
-    G.add_node("M2",names="Chemical A",type='raw_material',price=200,flow_rate_lower_bound=1)
-    G.add_node("M3",names="Chemical B", type='raw_material',price=100,flow_rate_lower_bound=2)
+    G.add_node("M2",names="Chemical A",type='raw_material',price=200,flow_rate_upper_bound=50)
+    G.add_node("M3",names="Chemical B", type='raw_material',price=100)
     G.add_node("O1",names="Reactor A",fix_cost=2000, proportional_cost=400)
     G.add_node("O2", names="Reactor B",fix_cost=1000, proportional_cost=400)
     G.add_edge("O1","M1", weight = 3) 

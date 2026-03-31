@@ -18,8 +18,8 @@ operating_unit_proportional_cost=0
 
 materials:
 M1: product, flow_rate_lower_bound=100
-M2: raw_material, price=200, flow_rate_lower_bound=1
-M3: raw_material, price=100, flow_rate_lower_bound=2
+M2: raw_material, price=200, flow_rate_upper_bound=50
+M3: raw_material, price=100
 
 operating_units:
 O1: fix_cost=2000, proportional_cost=400
