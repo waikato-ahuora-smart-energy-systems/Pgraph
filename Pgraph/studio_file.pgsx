@@ -58,8 +58,8 @@
     <Material ID="2" Name="Chemical A" Type="0">
       <ParameterList>
         <Parameter Name="price" Prefix="Price: " Value="200" Visible="false"/>
-        <Parameter Name="reqflow" Prefix="Required flow: " Value="1" Visible="false"/>
-        <Parameter Name="maxflow" Prefix="Maximum flow: " Value="-1" Visible="false"/>
+        <Parameter Name="reqflow" Prefix="Required flow: " Value="-1" Visible="false"/>
+        <Parameter Name="maxflow" Prefix="Maximum flow: " Value="50" Visible="false"/>
         <Parameter Name="quantitytype" Prefix="Quantity type: " Value="Mass" Visible="false"/>
         <Parameter Name="measurementunit" Prefix="Measurement unit: " Value="gram (g)" Visible="false"/>
       </ParameterList>
@@ -68,7 +68,7 @@
     <Material ID="3" Name="Chemical B" Type="0">
       <ParameterList>
         <Parameter Name="price" Prefix="Price: " Value="100" Visible="false"/>
-        <Parameter Name="reqflow" Prefix="Required flow: " Value="2" Visible="false"/>
+        <Parameter Name="reqflow" Prefix="Required flow: " Value="-1" Visible="false"/>
         <Parameter Name="maxflow" Prefix="Maximum flow: " Value="-1" Visible="false"/>
         <Parameter Name="quantitytype" Prefix="Quantity type: " Value="Mass" Visible="false"/>
         <Parameter Name="measurementunit" Prefix="Measurement unit: " Value="gram (g)" Visible="false"/>
