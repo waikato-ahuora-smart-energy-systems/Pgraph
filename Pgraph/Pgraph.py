@@ -35,7 +35,7 @@ class Pgraph():
         self.ME=mutual_exclusion
         self.solver=solver
         self.max_sol=max_sol
-        self.path=os.path.dirname(os.path.realpath(__file__))+r"/solver/"
+        self.library_path=os.path.dirname(os.path.realpath(__file__))+r"/solver/"
         self.gmatlist=[]
         self.goplist=[]
         self.goolist=[]
@@ -127,7 +127,7 @@ class Pgraph():
 
         G=self.G
         ME=self.ME
-        path=self.path
+        path=self.library_path
         ### MAKE INPUT FILE #############
         
         # Declare default values
@@ -314,8 +314,8 @@ class Pgraph():
                 
         prelines.append("\n")
         
-        if system is None:
-            system = platform.system()  # Detect the current operating system
+
+        system = platform.system()  # Detect the current operating system
         
         if system=="Windows": #support for windows
             with open(path+'input.in', 'w') as f:
@@ -326,7 +326,7 @@ class Pgraph():
                 for line in prelines:
                     f.write(line)
 
-    def solve(self,system=None,skip_wine=False, solver_name='pgraph_solver.exe', input_file: str = "", output_file: str = ""):
+    def solve(self,system=None,skip_wine=False, solver_name='pgraph_solver.exe', input_file: str = "", output_file: str = "", path=None):
         '''
         solve(system=None,skip_wine=False)
         
@@ -339,7 +339,7 @@ class Pgraph():
         solver_name: (string) For advanced users only. Choose your customized solver. 'pgraph_solver.exe' or 'pgraph_solver_new.exe'
         path: (string) path to the custom solver. If None, then the default library installation path will be used.
         '''
-        path=self.path
+        path=self.library_path
         max_sol=self.max_sol
         solver=self.solver
         # solver_dict={0:"MSG",1:"SSG",2:"SSGLP",3:"INSIDEOUT"}
@@ -349,9 +349,9 @@ class Pgraph():
             
         if system=="Windows": #support for windows
             if type(self.input_file)==str:
-                rc=subprocess.run([path+solver_name,solver, self.input_file, path+"test_out.out", str(max_sol)]+additional_argument_list)
+                rc=subprocess.run([path+solver_name,solver, self.input_file, path+"test_out.out", str(max_sol)])
             else:
-                rc=subprocess.run([path+solver_name,solver, path+"input.in", path+"test_out.out", str(max_sol)]+additional_argument_list)                
+                rc=subprocess.run([path+solver_name,solver, path+"input.in", path+"test_out.out", str(max_sol)])                
         elif system=="Linux":
             # detect architecture, ARM or x86
             if platform.machine() in ["arm64", "aarch64"]:
@@ -385,7 +385,7 @@ class Pgraph():
         output_file: (string) Path to generate the input file in. If None, then the default library installation path will be used.       
         '''
     
-        path=self.path
+        path=self.library_path
         gmatlist=[]
         goplist=[]
         goolist=[]
@@ -1089,7 +1089,7 @@ class Pgraph():
             print("Generated P-graph Studio File at ", path)
         return header+xml    
         
-    def run(self, skip_wine=False, solver_name='pgraph_solver.exe', solver_path=None, input_file: str | None = None, output_file: str | None = None):
+    def run(self, skip_wine=False, solver_name='pgraph_solver.exe', path=None, input_file: str | None = None, output_file: str | None = None):
         '''
         run(system=None,skip_wine=False)
         
@@ -1105,9 +1105,9 @@ class Pgraph():
         system = platform.system()
         
         if system=="Windows":
-            self.create_solver_input(system=system)
-            self.solve(system=system,skip_wine=skip_wine,solver_name=solver_name,path=solver_path)
-            self.read_solutions(system=system)
+            self.create_solver_input(input_file=input_file)
+            self.solve(system=system,skip_wine=skip_wine,solver_name=solver_name,path=path)
+            self.read_solutions()
             # print('chong',path)
         elif system=="Linux":
             if input_file is None:
@@ -1116,7 +1116,7 @@ class Pgraph():
             if output_file is None:
                 # set output file to a temp file
                 output_file = tempfile.NamedTemporaryFile(delete=False).name
-            self.create_solver_input(system=system,input_file=input_file)
+            self.create_solver_input(input_file=input_file)
             self.solve(
                 system=system,
                 skip_wine=skip_wine,
@@ -1124,7 +1124,7 @@ class Pgraph():
                 input_file=input_file,
                 output_file=output_file,
             )
-            self.read_solutions(system=system,output_file=output_file)
+            self.read_solutions(output_file=output_file)
         
     def get_sol_num(self):
         '''
