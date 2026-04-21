@@ -11,7 +11,7 @@ import tempfile
 
 
 class Pgraph():
-    def __init__(self, problem_network, mutual_exclusion=[], solver="INSIDEOUT",max_sol=100, input_file=None, additional_data=None):
+    def __init__(self, problem_network, mutual_exclusion=[], solver="INSIDEOUT",max_sol=100, input_file=None):
         ''' 
         Pgraph(problem_network, mutual_exclusion=[], solver="INSIDEOUT",max_sol=100)
                 
@@ -21,9 +21,8 @@ class Pgraph():
         Arguments
         problem_network: (DiGraph() object) Directed graph object specified using networkx
         mutual_exclusion: (list of list) List of lists containing mutually excluded elements. Symbols of nodes should be used. e.g. "M1"
-        solver: (str) Solver type that is used. Possibilities include "MSG", "SSG", "SSGLP" (for SSG+LP), "INSIDEOUT" (for ABB)
-        max_sol: (int) Maximum number of solutions required for the solver.
-        additional_data: (object or list of objects) Used to define additional data that needs to be put at the end of the P-graph solver input file. Necessary for specific algorithms, ignored otherwise.
+        solver: (str): Solver type that is used. Possibilities include "MSG", "SSG", "SSGLP" (for SSG+LP), "INSIDEOUT" (for ABB)
+        max_sol: (int): Maximum number of solutions required for the solver.
         
         '''
     
@@ -36,7 +35,7 @@ class Pgraph():
         self.ME=mutual_exclusion
         self.solver=solver
         self.max_sol=max_sol
-        self.path=os.path.dirname(os.path.realpath(__file__))+r"/solver/"
+        self.library_path=os.path.dirname(os.path.realpath(__file__))+r"/solver/"
         self.gmatlist=[]
         self.goplist=[]
         self.goolist=[]
@@ -114,7 +113,7 @@ class Pgraph():
         ax.set_title("Original Problem ",y=titlepos)
         return ax
     
-    def create_solver_input(self, input_file):
+    def create_solver_input(self, input_file=None):
         '''
         create_solver_input()
         
@@ -122,33 +121,46 @@ class Pgraph():
         This function creates the solver input from the networkx DiGraph() object specified.
         
         Arguments
-        path: (string) Path of folder to generate the input file in (does not fontain file name, only folder location). If None, then the default library installation path will be used.
+        input_file: (string) Path of the input file to be generated. 
 
         '''
 
         G=self.G
         ME=self.ME
-        path=self.path
+        path=self.library_path
         ### MAKE INPUT FILE #############
+        
+        # Declare default values
+        material_flow_rate_lower_bound = 0
+        material_flow_rate_upper_bound =1000000000
+        material_price = 0
+        operating_unit_capacity_lower_bound = 0
+        operating_unit_capacity_upper_bound = 1000000000
+        operating_unit_fix_cost = 0
+        operating_unit_proportional_cost = 0
+        material_type = 'raw_material'
+        mass_unit = 't'
+        time_unit = 'y'
+        money_unit = 'NZD'
+        
         prelines=[
         'file_type=PNS_problem_v1','\n',
         'file_name=Graph_1','\n',
         '\n',
         'measurement_units:','\n',
-        'mass_unit=t','\n',
-        'time_unit=y','\n',
-        'money_unit=USD','\n',
+        'mass_unit=',mass_unit,'\n',
+        'time_unit=',time_unit,'\n',
+        'money_unit=',money_unit,'\n',
         '\n',
         'defaults:','\n',
-        'material_type=raw_material','\n',
-        'material_flow_rate_lower_bound=0','\n',
-        'material_flow_rate_upper_bound=10000000','\n',
-        'material_price=0','\n',
-        'operating_unit_capacity_lower_bound=0','\n',
-        'operating_unit_capacity_upper_bound=10000000','\n',
-        'operating_unit_fix_cost=0','\n',
-        'operating_unit_proportional_cost=0','\n',
-        '\n',
+        'material_type=',str(material_type),'\n',
+        'material_flow_rate_lower_bound=',str(material_flow_rate_lower_bound),'\n',
+        'material_flow_rate_upper_bound=',str(material_flow_rate_upper_bound),'\n',
+        'material_price=',str(material_price),'\n',
+        'operating_unit_capacity_lower_bound=',str(operating_unit_capacity_lower_bound),'\n',
+        'operating_unit_capacity_upper_bound=',str(operating_unit_capacity_upper_bound),'\n',
+        'operating_unit_fix_cost=',str(operating_unit_fix_cost),'\n',
+        'operating_unit_proportional_cost=',str(operating_unit_proportional_cost),'\n',        '\n',
         'materials:','\n'
         ]
 
@@ -158,7 +170,7 @@ class Pgraph():
                 for k,v in G.nodes[n].items():
                     if k=='type':
                         add_list[0]=add_list[0]+v
-                    elif k!="names":
+                    elif k not in ["names", "units"]:
                         add_list.append(str(k)+"="+str(v))
                 n_=", ".join(add_list)
                 prelines.append(n_)
@@ -167,6 +179,89 @@ class Pgraph():
         prelines.append('\n')
         prelines.append('operating_units:')
         prelines.append('\n')
+        
+        self.problem_materials={'ID':[],'names':[],'type':[],'flow_rate_lower_bound':[],'flow_rate_upper_bound':[],'price':[],'time_unit':[],'money_unit':[],'mass_unit':[]}
+        for n in G.nodes():
+            if n[0]=="M":
+                #print(n)
+                self.problem_materials['ID'].append(n)
+                for k,v in G.nodes[n].items():
+                    #print('items',G.nodes[n])
+                    if k not in ['units']:
+                        self.problem_materials[k].append(v)
+                        # print(k,':-',v)
+                    elif k in ['units']:
+                        #print(v)
+                        for i,j in enumerate(v):
+                            self.problem_materials[j].append(v[j])
+                            # print(i,'yy',j,'jj',v[j])
+                    
+                    # else:
+
+                        #self.problem_materials['units'][]
+                if 'flow_rate_lower_bound' not in G.nodes[n]:
+                    self.problem_materials['flow_rate_lower_bound'].append(material_flow_rate_lower_bound)
+                if 'flow_rate_upper_bound' not in G.nodes[n]:
+                    self.problem_materials['flow_rate_upper_bound'].append(material_flow_rate_upper_bound)
+                if 'price' not in G.nodes[n]:
+                    self.problem_materials['price'].append(material_price)
+                if 'type' not in G.nodes[n]:
+                    self.problem_materials['type'].append(material_type)
+                if 'units' not in G.nodes[n] or not all(key in G.nodes[n]['units'] for key in ['time_unit', 'money_unit', 'mass_unit']):
+                    self.problem_materials['money_unit'].append(money_unit)
+                    self.problem_materials['time_unit'].append(time_unit)
+                    self.problem_materials['mass_unit'].append(mass_unit)                    
+                    
+
+
+        self.namelist_mat={"ID":[],"names":[],'type':[]}
+        for n in G.nodes():
+
+            if n[0] =="M":
+                for k, v in G.nodes[n].items():
+                    #print(G.nodes[n].items())
+                    #print(v)
+                    if k =='names':
+                        self.namelist_mat['ID'].append(n)
+                        self.namelist_mat['names'].append(v)
+                    elif k=='type':
+                        self.namelist_mat['type'].append(v)
+
+
+        #print(self.namelist_mat)
+
+        self.namelist_op = {"ID": [], "names": []}
+        for n in G.nodes():
+            if n[0] == "O":
+                for k, v in G.nodes[n].items():
+                    # print(G.nodes[n].items())
+                    if k == 'names':
+                        self.namelist_op['ID'].append(n)
+                        self.namelist_op['names'].append(v)
+
+        #print(self.namelist_op)
+        self.problem_operating={'ID':[],'names':[],'fix_cost':[],'proportional_cost':[],'capacity_lower_bound':[],'capacity_upper_bound':[]}
+        for n in G.nodes():
+            # print('try',n)
+            if n[0]=="O":
+                self.problem_operating['ID'].append(n)
+                for k,v in G.nodes[n].items():
+                    # print(k,'gg',v)
+                    # if k in ['capacity_lower_bound'] or k in ['capacity_upper_bound']:
+                    #     pass
+
+                    
+                    if k not in ['units']:
+                        self.problem_operating[k].append(v)
+                        #print(self.problem_operating[k])
+                if 'capacity_lower_bound' not in G.nodes[n]:
+                    self.problem_operating['capacity_lower_bound'].append(operating_unit_capacity_lower_bound)
+                if 'capacity_upper_bound' not in G.nodes[n]:
+                    self.problem_operating['capacity_upper_bound'].append(operating_unit_capacity_upper_bound)
+                if 'fix_cost' not in G.nodes[n]:
+                    self.problem_operating['fix_cost'].append(operating_unit_fix_cost)
+                if 'proportional_cost' not in G.nodes[n]:
+                    self.problem_operating['proportional_cost'].append(operating_unit_proportional_cost)
 
         for n in G.nodes():
             if n[0]=="O":        
@@ -178,7 +273,7 @@ class Pgraph():
                     elif len(add_list)==1 and first and k!="names":
                         add_list[0]=add_list[0]+str(k)+"="+str(v)
                         first=False
-                    elif k!="names":
+                    elif k not in ["names", "units"]:
                         add_list.append(str(k)+"="+str(v))
                 n_=", ".join(add_list)
                 prelines.append(n_)
@@ -194,7 +289,8 @@ class Pgraph():
                 for x1, x2 in G.in_edges(n):
                     add_str=add_str+str(G[x1][x2]["weight"])+" "+x1
                     add_str=add_str+" + "
-                add_str=add_str[:-3]
+                if G.in_edges(n):
+                    add_str=add_str[:-3]
                 add_str=add_str+" => "
                 for x1, x2 in G.out_edges(n):
                     add_str=add_str+str(G[x1][x2]["weight"])+" "+x2
@@ -216,13 +312,21 @@ class Pgraph():
             prelines.append(MEstring)
             prelines.append("\n")
                 
-        prelines.append("\n")        
-                
-        with open(path+'input.in', 'w') as f:
-            for line in prelines:
-                f.write(line)
+        prelines.append("\n")
+        
 
-    def solve(self,system=None,skip_wine=False, solver_name='pgraph_solver.exe', input_file: str = "", output_file: str = ""):
+        system = platform.system()  # Detect the current operating system
+        
+        if system=="Windows": #support for windows
+            with open(path+'input.in', 'w') as f:
+                for line in prelines:
+                    f.write(line)    
+        elif system=="Linux":      
+            with open(input_file, 'w') as f:
+                for line in prelines:
+                    f.write(line)
+
+    def solve(self,system=None,skip_wine=False, solver_name='pgraph_solver.exe', input_file: str = "", output_file: str = "", path=None):
         '''
         solve(system=None,skip_wine=False)
         
@@ -235,28 +339,19 @@ class Pgraph():
         solver_name: (string) For advanced users only. Choose your customized solver. 'pgraph_solver.exe' or 'pgraph_solver_new.exe'
         path: (string) path to the custom solver. If None, then the default library installation path will be used.
         '''
-        path=self.path
+        path=self.library_path
         max_sol=self.max_sol
         solver=self.solver
         # solver_dict={0:"MSG",1:"SSG",2:"SSGLP",3:"INSIDEOUT"}
-        
-        additional_argument_list = []
-        for arg,value in additional_arguments.items():
-            additional_argument_list.append("--"+arg)
-            if value is not None and value != "":
-                if isinstance(value, list):
-                    additional_argument_list.extend([str(v) for v in value])
-                else:
-                    additional_argument_list.append(str(value))
         
         if system==None:
             system=platform.system()
             
         if system=="Windows": #support for windows
             if type(self.input_file)==str:
-                rc=subprocess.run([path+solver_name,solver, self.input_file, path+"test_out.out", str(max_sol)]+additional_argument_list)
+                rc=subprocess.run([path+solver_name,solver, self.input_file, path+"test_out.out", str(max_sol)])
             else:
-                rc=subprocess.run([path+solver_name,solver, path+"input.in", path+"test_out.out", str(max_sol)]+additional_argument_list)                
+                rc=subprocess.run([path+solver_name,solver, path+"input.in", path+"test_out.out", str(max_sol)])                
         elif system=="Linux":
             # detect architecture, ARM or x86
             if platform.machine() in ["arm64", "aarch64"]:
@@ -279,7 +374,7 @@ class Pgraph():
 
         ################
     
-    def read_solutions(self, output_file):
+    def read_solutions(self, output_file=None):
         '''
         read_solutions()
         
@@ -287,18 +382,23 @@ class Pgraph():
         Reads the solution from the solver.     
         
         Arguments
-        path: (string) Path of folder to generate the input file in (does not fontain file name, only folder location). If None, then the default library installation path will be used.       
+        output_file: (string) Path to generate the input file in. If None, then the default library installation path will be used.       
         '''
     
-        if path==None:
-            path=self.path
+        path=self.library_path
         gmatlist=[]
         goplist=[]
         goolist=[]
         
+        system = platform.system()  # Detect the current operating system
+        
         #clean strings
-        with open(output_file, 'r') as f:
-            lines = f.readlines()
+        if system=="Windows": #support for windows
+            with open(path+"test_out.out","r") as f:
+                lines = f.readlines()
+        elif system=="Linux":    
+            with open(output_file, 'r') as f:    
+                lines = f.readlines()
         for i in range(len(lines)-1,1,-1):
             if lines[i-1].strip() == "Operating units(1):":
                 continue
@@ -369,7 +469,38 @@ class Pgraph():
                     s=False
 
                 goplist.append(toplist)
-                gmatlist.append(tmatlist)        
+                gmatlist.append(tmatlist)
+                
+            for solution in gmatlist:
+                for material in solution:
+                    # print(material)
+                    material_name = material[0]
+                    node = self.G.nodes[material_name]
+                    #print(len(material))
+                    if len(material) == 5:
+                        if not node.get('units'):
+                            material[2] = "NZD/t"
+                        else:
+                            units = node.get("units")
+                            time_unit = units.get("time_unit")
+                            money_unit = units.get("money_unit")
+                            mass_unit = units.get("mass_unit")
+                            material[2] = money_unit + "/" + time_unit
+                            material[4] = mass_unit + "/" + time_unit
+                            # print(material)
+
+            for solution in goplist:
+                for operator in solution:
+                    operator_name = operator[1]
+                    node = self.G.nodes[operator_name]
+                    #if node['units']:
+                    if not node.get('units'):
+                        operator[3] = "NZD/t"
+                    else:
+                        units = node.get("units")
+                        time_unit = units.get("time_unit")
+                        money_unit = units.get("money_unit")
+                        operator[3] = money_unit + "/" + time_unit
             self.goplist=goplist
             self.gmatlist=gmatlist
             self.goolist=goolist
@@ -958,7 +1089,7 @@ class Pgraph():
             print("Generated P-graph Studio File at ", path)
         return header+xml    
         
-    def run(self, system=None, skip_wine=False, solver_name='pgraph_solver.exe', input_file: str | None = None, output_file: str | None = None):
+    def run(self, skip_wine=False, solver_name='pgraph_solver.exe', path=None, input_file: str | None = None, output_file: str | None = None):
         '''
         run(system=None,skip_wine=False)
         
@@ -969,23 +1100,31 @@ class Pgraph():
         system: (string) (optional) Operating system. Options of "Windows", "Linux". MacOS is not supported yet. Specifying this makes function slightly faster.
         skip_wine: (boolean) Only relevent for Linux. Skip the dependency "wine" if it is already installed. 
         solver_name= (string) For advanced users only. Choose your customized solver. 'pgraph_solver.exe' or 'pgraph_solver_new.exe'
-        path = (string) path to the custom solver. If None, then the default library installation path will be used.
+        solver_path = (string) path to the custom solver. If None, then the default library installation path will be used.
         '''
-        if input_file is None:
-            # set input file to a temp file
-            input_file = tempfile.NamedTemporaryFile(delete=False).name
-        if output_file is None:
-            # set output file to a temp file
-            output_file = tempfile.NamedTemporaryFile(delete=False).name
-        self.create_solver_input(input_file=input_file)
-        self.solve(
-            system=system,
-            skip_wine=skip_wine,
-            solver_name=solver_name,
-            input_file=input_file,
-            output_file=output_file
-        )
-        self.read_solutions(output_file=output_file)
+        system = platform.system()
+        
+        if system=="Windows":
+            self.create_solver_input(input_file=input_file)
+            self.solve(system=system,skip_wine=skip_wine,solver_name=solver_name,path=path)
+            self.read_solutions()
+            # print('chong',path)
+        elif system=="Linux":
+            if input_file is None:
+                # set input file to a temp file
+                input_file = tempfile.NamedTemporaryFile(delete=False).name
+            if output_file is None:
+                # set output file to a temp file
+                output_file = tempfile.NamedTemporaryFile(delete=False).name
+            self.create_solver_input(input_file=input_file)
+            self.solve(
+                system=system,
+                skip_wine=skip_wine,
+                solver_name=solver_name,
+                input_file=input_file,
+                output_file=output_file,
+            )
+            self.read_solutions(output_file=output_file)
         
     def get_sol_num(self):
         '''
@@ -1000,32 +1139,32 @@ class Pgraph():
         num_sol=len(self.goolist)
         return num_sol
 if __name__=="__main__":
-    
+    pass
     ##TEST1########################################
     ### Prepare Network Structure #############
-    G = nx.DiGraph()
-    G.add_node("M1",names="Product A",type='product',flow_rate_lower_bound=100)
-    G.add_node("M2",names="Chemical A",type='raw_material',price=200,flow_rate_upper_bound=50)
-    G.add_node("M3",names="Chemical B", type='raw_material',price=100)
-    G.add_node("O1",names="Reactor A",fix_cost=2000, proportional_cost=400)
-    G.add_node("O2", names="Reactor B",fix_cost=1000, proportional_cost=400)
-    G.add_edge("O1","M1", weight = 3) 
-    G.add_edge("O2","M1", weight = 1) 
-    G.add_edge("M2","O1", weight = 2)
-    G.add_edge("M3","O2", weight = 4)
-    ME=[["O1","O2"]]
-    P=Pgraph(problem_network=G, mutual_exclusion=ME, solver="SSG",max_sol=10)
-    ax1=P.plot_problem()
-    plt.show()
-    P.run(solver_name='pgraph_solver.exe')
-    total_sol_num=P.get_sol_num()
-    print(total_sol_num)
-    for i in range(total_sol_num): #show all solutions in plot
-        ax=P.plot_solution(sol_num=i)
+    # G = nx.DiGraph()
+    # G.add_node("M1",names="Product A",type='product',flow_rate_lower_bound=100)
+    # G.add_node("M2",names="Chemical A",type='raw_material',price=200,flow_rate_upper_bound=50)
+    # G.add_node("M3",names="Chemical B", type='raw_material',price=100)
+    # G.add_node("O1",names="Reactor A",fix_cost=2000, proportional_cost=400)
+    # G.add_node("O2", names="Reactor B",fix_cost=1000, proportional_cost=400)
+    # G.add_edge("O1","M1", weight = 3) 
+    # G.add_edge("O2","M1", weight = 1) 
+    # G.add_edge("M2","O1", weight = 2)
+    # G.add_edge("M3","O2", weight = 4)
+    # ME=[["O1","O2"]]
+    # P=Pgraph(problem_network=G, mutual_exclusion=ME, solver="SSG",max_sol=10)
+    # ax1=P.plot_problem()
+    # plt.show()
+    # P.run(solver_name='pgraph_solver.exe')
+    # total_sol_num=P.get_sol_num()
+    # print(total_sol_num)
+    # for i in range(total_sol_num): #show all solutions in plot
+    #     ax=P.plot_solution(sol_num=i)
         
-        plt.show()
+    #     plt.show()
     
-    P.to_studio(verbose=True)
+    # P.to_studio(verbose=True)
     #####################################
     
     '''
